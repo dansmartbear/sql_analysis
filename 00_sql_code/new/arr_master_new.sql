@@ -217,10 +217,11 @@ prod_map as
             -- 09/04/2025 [Dan Girard] Update logic for Test to be API Hub Test
             -- 12/04/2025 [Dan Girard] Update logic for Test to be Swagger and API Hub to Swagger
             -- 05/15/2026 [Dan Girard] Updated for API Hub mapping
-            when upper(ns.sisense_product_rollup) = 'TEST'
-                and ns.direct_ecomm_flag = 'Direct'                      then 'API Hub'
-            when upper(ns.sisense_product_rollup) = 'TEST'
-                and ns.direct_ecomm_flag = 'Ecomm'                       then 'API Hub'
+            -- 05/28/2026 [Dan Girard] TEST/API HUB + Direct = API Hub Test; TEST/API HUB + Ecomm = Swagger
+            when upper(ns.sisense_product_rollup) in ('TEST', 'API HUB')
+                and ns.direct_ecomm_flag = 'Direct'                      then 'API Hub Test'
+            when upper(ns.sisense_product_rollup) in ('TEST', 'API HUB')
+                and ns.direct_ecomm_flag = 'Ecomm'                       then 'Swagger'
             when upper(ns.sisense_product_rollup) = 'CONTRACT TESTING'   then 'Pactflow'
             -- 09/11/2025 [Dan Girard] Changed from Bugsnag to BugSnag
             when upper(ns.sisense_product_rollup) = 'BUGSNAG'            then 'BugSnag'
@@ -433,10 +434,11 @@ prod_map as
             when u.datasource in ('BS_STRIPE', 'BS_HEROKU')                 then 'Ecomm'
             when u.datasource = 'BS_Direct'                                  then 'Direct'
             when u.productgroup in ('Capture', 'Cucumber', 'Squad', 'Zephyr Scale') then 'Ecomm'
+            -- 05/28/2026 [Dan Girard] Added Portal
             when u.productgroup in (
                 'AlertSite', 'AQTime', 'Collaborator', 'Hiptest', 'LoadComplete',
                 'QAComplete', 'RAPI Performance', 'RAPI Test', 'RAPI Virtualization',
-                'TestComplete', 'TestEngine', 'Zephyr E'
+                'TestComplete', 'TestEngine', 'Zephyr E', 'Portal'
             ) then 'Direct'
             when u.date <= '2022-06-30'
                 and coalesce(u.transexternalid, '') = ''
@@ -589,7 +591,9 @@ prod_map as
         case
             when u.datasource = 'NS' then 'As Reported'
             else 'Proforma'
-        end as datasource_group
+        end as datasource_group,
+        -- 05/29/2026 [Dan Girard] Added SFDC Name; sourced from sfdc_account_name in vw_sfdc_invoice_data
+        sf.sfdc_account_name as sfdc_name
     from
         raw_union u
         left join finance_db.public.dim_globalultimateparent_map b
@@ -673,7 +677,9 @@ select
     m.product_name_group,
     m.sfdc_ent_core_flag,
     m.billing_term,
-    m.datasource_group
+    m.datasource_group,
+    -- 05/29/2026 [Dan Girard] Added SFDC Name
+    m.sfdc_name
 from
     main m
 ;
