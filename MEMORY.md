@@ -61,9 +61,9 @@ See `schema_catalog.md` in this folder for the full catalog of tracked tables an
 ### 2026-05-17/18 — master_billing_new: refactor complete (final working state)
 
 **Table:** `finance_db.dev_netsuite.master_billing_new`
-**File:** `SQL Analysis/00_sql_code/master_billing_new.sql`
-**Companion view:** `SQL Analysis/00_sql_code/vw_sfdc_invoice_data.sql`
-**Validation:** `SQL Analysis/00_sql_code/master_billing_new_validation.sql`
+**File:** `SQL Analysis/00_sql_code/new/sp_master_billing_new.sql`
+**Companion view:** `SQL Analysis/00_sql_code/new/vw_sfdc_invoice_data.sql`
+**Validation:** `SQL Analysis/00_sql_code/validation/master_billing_new_validation.sql`
 
 **CTE chain:** `raw_union` → `tiers` → `main` → final SELECT
 
@@ -105,7 +105,7 @@ See `schema_catalog.md` in this folder for the full catalog of tracked tables an
 ### 2026-05-18 — arr_master_new: first-pass refactor complete
 
 **Table:** `finance_db.dev_netsuite.arr_master_new`
-**File:** `SQL Analysis/00_sql_code/arr_master_new.sql`
+**File:** `SQL Analysis/00_sql_code/new/sp_arr_master_new.sql`
 **Status:** First-pass refactor written; not yet validated against `public.arr_master`.
 
 **CTE chain:** `prod_map` → `raw_union` → `main` → final SELECT
@@ -133,7 +133,7 @@ Proforma branch column aliases corrected to match actual DDL:
 - `naics_sector` — confirmed in DDL; pulled directly
 - `createdfrom`, `pochecknumber`, `productline` — present in DDL but excluded per 01/14/2026 removal
 
-**Validation:** `SQL Analysis/00_sql_code/arr_master_new_validation.sql` — created 05/20/2026.
+**Validation:** `SQL Analysis/00_sql_code/validation/arr_master_new_validation.sql` — created 05/20/2026.
 - Compares `finance_db.public.arr_master` vs `finance_db.dev_netsuite.arr_master_new`.
 - Dimensions: `direct_ecomm_flag`, `direct_indirect`, `product_name`.
 - `summary_compare`: total rows and `acv` side-by-side (direct_ecomm_flag grouping available, commented out).
@@ -145,6 +145,34 @@ Proforma branch column aliases corrected to match actual DDL:
 - Fan-out risk on `prod_map` join — verify `dim_product_dm_hierarchy_tbl` has unique `productgroup` values before promoting.
 
 **Net effect:** One fewer join in `master_billing_new`; `naics_sector` values are identical to what the view computes.
+
+### 2026-06-29 — arr_master_retention_new: refactor complete
+
+**Procedure:** `finance_db.dev_netsuite.sp_arr_master_retention_new()`
+**File:** `SQL Analysis/00_sql_code/new/sp_arr_master_retention_new.sql`
+**Target table:** `finance_db.dev_netsuite.arr_master_retention_new`
+**Validation:** `SQL Analysis/00_sql_code/validation/arr_master_retention_new_validation.sql`
+
+**CTE chain:** `waterfall_dates` → `dates` → `arr` → `distinct_group` → `filler` → `mth_detail` → `mth_yoy_detail` → `qtr_dates` → `qtr_arr` → `distinct_group_q` → `qtr_filler` → `qtr_detail` → `qtr_yoy_detail` → `main` → final SELECT
+
+**Key changes from original:**
+- `join ... on 1=1` (cross join pattern) → explicit `cross join` in `dates`, `qtr_dates`, `filler`, `qtr_filler`
+- Dead blank-normalization removed from `filler`/`qtr_filler` — `arr`/`qtr_arr` already normalize upstream
+- Table aliases added throughout; `as` keyword added to all column aliases
+- `/* */` block comment → `--` style; per-CTE "what" comments removed
+- `group by all` retained in final SELECT — required to handle potential fan-out from `dim_product_group_map` join
+- `ver_date` retained in `main` union branches (computed as `current_timestamp()` in each branch)
+- `sum(m.cur_arr)` retained in window function CASE in final SELECT — works within `group by all` aggregation context
+- Alias forward references used for `age`, `age_gup`, `age_pbt` (valid in Snowflake)
+
+**Source:** `finance_db.dev_netsuite.arr_master_waterfall`
+**dim_product_group_map note:** Join on `upper(m.productgroup) = upper(p.product_name)` — potential fan-out if dim has duplicate product_name entries; `group by all` handles this.
+
+**Open items:**
+- Row count discrepancy vs `arr_master_retention` observed during validation (cur_arr totals match). Likely a timing issue — original table may have been built from a different snapshot of `arr_master_waterfall`. Re-run original SP to refresh baseline, then re-validate.
+- Confirm whether `billing_period` threshold difference (`<= 33` in `arr` vs `< 35` in `qtr_arr`) is intentional.
+
+---
 
 ### 2026-05-17 — pf_billings structure confirmed
 
