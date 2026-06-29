@@ -27,7 +27,8 @@
   05/15/2026  Dan Girard  Added join to vw_naics_mapping_new; added naics_sector column (NAICS_SECTOR_CODE - NAICS_SECTOR)
   05/18/2026  Dan Girard  Added product_group from dim_product_dm_hierarchy_tbl
   05/18/2026  Dan Girard  Added productgroup from dim_product_dm_hierarchy_tbl
-
+  06/23/2026  Dan Girard  Added transaction_id (netsuite_id) and boomi_external_id
+  
   Owner       Dan Girard
 ==============================================================================*/
 create or replace view finance_db.dev_netsuite.vw_ns_ss546_new as
@@ -150,7 +151,10 @@ raw_union as (
         a.braintree_user_id,
         -- 04/14/2026 [Dan Girard] Added for Zephyr Advanced historical override
         a.new_item_id,
-        a.new_item_id_name
+        a.new_item_id_name,
+        -- 06/23/2026 [Dan Girard] Added transaction_id (netsuite_id) and boomi_external_id
+        a.transaction_id,
+        a.boomi_external_id
     from finance_db.ingest.ns_ss546_cm_pm_stg a
         left join finance_db.ingest.employee_stg_tbl e
             on a.salesperson = e.employee_id
@@ -259,7 +263,10 @@ raw_union as (
         a.braintree_user_id,
         -- 04/14/2026 [Dan Girard] Added for Zephyr Advanced historical override
         a.new_item_id,
-        a.new_item_id_name
+        a.new_item_id_name,
+        -- 06/23/2026 [Dan Girard] Added transaction_id (netsuite_id) and boomi_external_id
+        a.transaction_id,
+        a.boomi_external_id
     from finance_db.ingest.ns_ss546_stat_stg a
         -- 05/04/2026 [Dan Girard] Use new join table for salesperson location
         left join finance_db.ingest.employee_stg_tbl e
@@ -386,6 +393,8 @@ main as (
         u.braintree_user_id,
         u.new_item_id,
         u.new_item_id_name,
+        u.transaction_id,
+        u.boomi_external_id,
 
         -- 06/21/2023 [Dan Girard] direct_ecomm_base: first pass at Direct vs Ecomm channel
         --   based on product, customer category, transaction type, and date-based rules
@@ -546,7 +555,10 @@ select
     m.new_item_id_name,
     m.pochecknumber,
     m.externalid,
-    m.productline
+    m.productline,
+    -- 06/23/2026 [Dan Girard] Added transaction_id (netsuite_id) and boomi_external_id
+    m.transaction_id,
+    m.boomi_external_id
 
 from main m
     left join finance_db.public.dim_product_dm_hierarchy_tbl p

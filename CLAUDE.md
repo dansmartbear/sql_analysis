@@ -19,7 +19,11 @@ This workstation handles all SQL-related work: reviewing, optimizing, and refact
 4. Refactor or write SQL per the conventions in MEMORY.md and the sql-code-review skill.
 5. Verify output: column count, no duplicates, no bare column references, all logic preserved.
 6. When rewriting a view, always produce a companion validation query to confirm output matches the original.
-7. Save all `.sql` files (views, validation queries, scripts) to `SQL Analysis/00_sql_code/`. Save all other deliverables (docs, notes, catalogs) to the root `SQL Analysis/` folder. Never save to the temporary outputs folder. Update MEMORY.md with any new decisions.
+7. File locations for `.sql` files:
+   - `00_sql_code/original/` — read-only reference; never write or modify files here
+   - `00_sql_code/new/` — read and write all new or refactored SQL here
+   - `00_sql_code/validation/` — read and write all validation queries here
+   - Save all other deliverables (docs, notes, catalogs) to the root `SQL Analysis/` folder. Update MEMORY.md with any new decisions.
 
 ## Editorial Rules
 
