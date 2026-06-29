@@ -651,7 +651,7 @@ begin
         m.globalultimateparentupper,
         m.source,
         m.productgroup,
-        p.product_group as productgrouprollup,
+        p.productgroup as product_group_rollup,
         m.ship_region,
         m.naics_sector,
         m.date_under_contract,

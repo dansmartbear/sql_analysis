@@ -117,8 +117,8 @@ begin
         , acv                                         float
         , my                                          float
         , product_for_reporting                       varchar(500)
-        -- 05/18/2026 [Dan Girard] Renamed from product_group to product_group per dim table update
-        , product_group                               varchar(500)
+        -- 05/18/2026 [Dan Girard] Renamed from product_group to productgroup per dim table update
+        , productgroup                                varchar(500)
         , order_type_final                            varchar(30)
         , reporting_channel                           varchar(50)
         , recurring_status                            varchar(50)
@@ -276,7 +276,7 @@ begin
             ns.core_noncore,
             ns.direct_indirect,
             ns.product_name_group,
-            ns.product_group,  -- 05/18/2026 [Dan Girard] renamed from product_group
+            ns.productgroup,  -- 05/18/2026 [Dan Girard] renamed from product_group
             ns.pbt_group,
             -- 03/31/2025 [Dan Girard] ACV and MY pre-computed so main can sum them
             datediff(day, ifnull(ns.contractitemstartdate, current_date()), ifnull(ns.contractitemenddate, current_date())) + 1 as contract_length,
@@ -490,7 +490,7 @@ begin
             u.core_noncore,
             u.direct_indirect,
             u.product_name_group,
-            u.product_group,
+            u.productgroup,
             u.pbt_group,
             -- ---- SFDC enrichment -----------------------------------------------
             -- 02/07/2024 [Dan Girard] sfdc_closedate from vw_sfdc_invoice_data
@@ -766,7 +766,7 @@ begin
         m.acv,
         m.my,
         m.product_for_reporting,
-        m.product_group,
+        m.productgroup,
         m.order_type_final,
         m.reporting_channel,
         m.recurring_status,
