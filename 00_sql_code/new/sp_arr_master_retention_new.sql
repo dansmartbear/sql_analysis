@@ -16,7 +16,7 @@ begin
     --   finance_db.dev_netsuite.arr_master_retention_new
     --
     -- primary source tables:
-    --   finance_db.dev_netsuite.arr_master_waterfall
+    --   finance_db.dev_netsuite.arr_master_waterfall_new
     --   data_master_db.public.dimdate
     --   finance_db.public.dim_product_group_map
     --
@@ -41,7 +41,7 @@ begin
             min(wf.date_under_contract) as min_date,
             max(wf.date_under_contract) as max_date
         from
-            finance_db.dev_netsuite.arr_master_waterfall wf
+            finance_db.dev_netsuite.arr_master_waterfall_new wf
     ),
 
     dates as
@@ -101,7 +101,7 @@ begin
             -- 05/29/2026 [Dan Girard] Added SFDC_Name
             coalesce(a.sfdc_name, '') as sfdc_name
         from
-            finance_db.dev_netsuite.arr_master_waterfall a
+            finance_db.dev_netsuite.arr_master_waterfall_new a
         group by
             all
     ),
@@ -344,7 +344,7 @@ begin
             -- 05/29/2026 [Dan Girard] Added SFDC_Name
             coalesce(a.sfdc_name, '') as sfdc_name
         from
-            finance_db.dev_netsuite.arr_master_waterfall a
+            finance_db.dev_netsuite.arr_master_waterfall_new a
         where
             a.date_under_contract = dateadd(day, -1, dateadd(quarter, 1, date_trunc(quarter, a.date_under_contract)))
         group by

@@ -39,8 +39,8 @@ begin
                 The ZEPHYR SCALE AUTOMATE branch in productgroup_child uses
                 arr.productgroup (raw) intentionally — preserved from original.
 
-                When this table is re-pointed to arr_master_new, update:
-                arr.region → arr.ship_region  (column was renamed)
+                Re-pointed to arr_master_new on 06/29/2026 [Dan Girard]:
+                arr.region updated to arr.ship_region (column renamed in new table)
 
     ***********************************************************************/
     create or replace table finance_db.dev_netsuite.arr_master_waterfall_new copy grants as
@@ -109,7 +109,7 @@ begin
             else 'Other'
         end as product_group_rollup,
         arr.acv,
-        arr.region as ship_region,
+        arr.ship_region,
         arr.naics_sector,
         arr.direct_ecomm_flag,
         arr.product_for_reporting_ns,
@@ -141,7 +141,7 @@ begin
         -- 05/29/2026 [Dan Girard] Added SFDC_Name
         arr.sfdc_name
     from
-        finance_db.dev_netsuite.arr_master arr
+        finance_db.dev_netsuite.arr_master_new arr
         left join dim_date dd
             on dd.month_end between arr.contractitemstartdate and arr.contractitemenddate
     ;
