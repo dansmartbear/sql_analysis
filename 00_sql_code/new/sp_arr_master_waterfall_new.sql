@@ -1,10 +1,10 @@
--- create or replace procedure finance_db.dev_netsuite.sp_arr_master_waterfall_new()
---     returns varchar
---     language sql
---     execute as owner
--- as
--- $$
--- begin
+create or replace procedure finance_db.dev_netsuite.sp_arr_master_waterfall_new()
+    returns varchar
+    language sql
+    execute as owner
+as
+$$
+begin
 
     /**********************************************************************
 

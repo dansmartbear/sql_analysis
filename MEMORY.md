@@ -169,6 +169,12 @@ Before resuming any `_new` refactor work on these objects, port these production
 
 **Still open:** `arr_master_retention_new_validation.sql`'s `dimension_diffs` `where` filter was uncommented (`where coalesce(o.row_count,0) <> coalesce(n.row_count,0)`) — now only surfaces row-count mismatches, not amount-only diffs, and differs from the other two files which still dump all rows. Not yet confirmed whether this is intentional.
 
+### 2026-07-29 — arr_master_new/waterfall_new/retention_new: cleanup pass
+
+- **`sp_arr_master_new.sql`**: `product_name_group` CASE gained `when product_name in ('BearQ') then 'BearQ'`.
+- **`sp_arr_master_waterfall_new.sql`**: the `create or replace procedure ... as $$ begin` wrapper had been commented out while the body and closing `end; $$` were not — the file was syntactically invalid. Wrapper uncommented; file is now a valid, runnable procedure.
+- **`sp_arr_master_retention_new.sql`**: source table repointed from `finance_db.dev_netsuite.arr_master_waterfall` (legacy) to `finance_db.dev_netsuite.arr_master_waterfall_new` (3 references + docstring) — retention now reads from the actual `_new` waterfall table.
+
 ### 2026-06-29 — arr_master_retention_new: refactor complete
 
 **Procedure:** `finance_db.dev_netsuite.sp_arr_master_retention_new()`

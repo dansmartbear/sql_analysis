@@ -588,6 +588,7 @@ begin
                     'TestComplete', 'VisualTest', 'Zephyr E', 'Reflect'
                 ) then 'Test'
                 when product_name in ('QTM', 'QTM4J')                                         then 'Test'
+                when product_name in ('BearQ') then 'BearQ'
                 else null
             end as product_name_group,
 
