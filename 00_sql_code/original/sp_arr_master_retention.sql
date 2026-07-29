@@ -1,4 +1,4 @@
-create or replace procedure finance_db.dev_netsuite.sp_arr_master_retention()
+create or replace procedure finance_db.public.sp_arr_master_retention()
     returns varchar
     language sql
     execute as owner
@@ -35,7 +35,7 @@ begin
     */
     
     -- create target table from cte stack
-    create or replace table finance_db.dev_netsuite.arr_master_retention copy grants as 
+    create or replace table finance_db.public.arr_master_retention copy grants as 
     
     with 
     -- cte: waterfall_dates
@@ -46,7 +46,7 @@ begin
             min(date_under_contract) as min_date,
             max(date_under_contract) as max_date
         from 
-            finance_db.dev_netsuite.arr_master_waterfall
+            finance_db.public.arr_master_waterfall
     )
 
     -- cte: dates
@@ -115,7 +115,8 @@ begin
             -- 05/29/2026 [Dan Girard] Added SFDC_Name
             coalesce(a.sfdc_name,'') sfdc_name
         from
-            finance_db.dev_netsuite.arr_master_waterfall a
+            finance_db.public.arr_master_waterfall a
+
         group by
             all
     )
@@ -459,7 +460,7 @@ begin
             -- 05/29/2026 [Dan Girard] Added SFDC_Name
             coalesce(a.sfdc_name,'') sfdc_name,
         from
-            finance_db.dev_netsuite.arr_master_waterfall a
+            finance_db.public.arr_master_waterfall a
         where
             a.date_under_contract = dateadd(day, -1, dateadd(quarter, 1, date_trunc(quarter, date_under_contract))) 
         group by
@@ -949,7 +950,7 @@ begin
         all
       ;
 
-    return 'Successfully created or replaced table finance_db.dev_netsuite.arr_master_retention.';
+    return 'Successfully created or replaced table finance_db.public.arr_master_retention.';
 
 end;
 $$

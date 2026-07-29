@@ -1,4 +1,4 @@
-create or replace procedure finance_db.dev_netsuite.sp_arr_master()
+create or replace procedure finance_db.public.sp_arr_master()
     returns varchar
     language sql
     execute as owner
@@ -6,7 +6,7 @@ as
 $$
 begin
 
-    create or replace table finance_db.dev_netsuite.arr_master copy grants as
+    create or replace table finance_db.public.arr_master copy grants as
     with 
     
     -- 06/25/2025 [Dan Girard] Pull product data to get PBT Group
@@ -183,6 +183,11 @@ begin
                                         ,'Maintenance Revenue YR 1 - Other') then 'Perpetual Maintenance'
               else 'Undefined'
               end stream_revenue,
+
+              -- 07/06/2026 [Dan Girard] Add TRANSACTION_ID and BOOMI_EXTERNAL_ID
+              ns.transaction_id,
+              ns.boomi_external_id,
+              
         from
             finance_db.public.vw_ns_ss546 ns
             left join finance_db.public.vw_naics_mapping d on ns.naics = to_char(d.naics_code)  -- 2/14/2023 [Dan Girard] Added join to new NAICS mapping table for the NAICS sector
@@ -268,6 +273,10 @@ begin
     
             -- 11/14/2024 [Dan Girard] Added stream_revenue
             , null stream_revenue
+
+              -- 07/06/2026 [Dan Girard] Add TRANSACTION_ID and BOOMI_EXTERNAL_ID
+             , '' transaction_id
+             , '' boomi_external_id
         from
             finance_db.public.arr_master_proforma a
             -- left join finance_db.public.dim_product_dm_hierarchy_tbl p on upper(concat(a.productgroup,'_',direct_ecomm_flag)) = p.lookup_map_upper    
@@ -547,7 +556,10 @@ begin
             when product_name in ('BitBar','CBT Sales Assisted','Device Cloud','LoadNinja','TestComplete','VisualTest','Zephyr E','Reflect') then 'Test'
             -- 03/11/2024 [Dan Girard] Added Reflect
             when product_name in ('QTM','QTM4J') then 'Test'
-                end product_name_group
+
+            -- 06/11/2026 [Dan Girard] Added product_name as the else
+            else product_name
+            end product_name_group
         
         -- 07/11/2024 [Dan Girard] Added Core/Enterprise flag
         -- 03/26/2025 [Dan Girard] Updated logic to remove nulls
@@ -574,6 +586,10 @@ begin
 
         -- 05/29/2026 [Dan Girard] Added SFDC Name
         , sf.sfdc_name
+
+        -- 07/06/2026 [Dan Girard] Add TRANSACTION_ID and BOOMI_EXTERNAL_ID
+        , a.transaction_id
+        , a.boomi_external_id
     from 
         main a
         left join finance_db.public.dim_globalultimateparent_map b on upper(a.globalultimateparent) = upper(b.globalultimateparent_orig)

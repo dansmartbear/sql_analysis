@@ -20,22 +20,26 @@ with
 
 original as (
     select
-        am.direct_ecomm_flag,
-        am.direct_indirect,
-        am.product_name,
+        direct_ecomm_flag,
+        direct_indirect,
+        product_name,
+        coalesce(naics_sector,'N/A') naics_sector,
+        coalesce(ship_region,'N/A') ship_region,
         count(*) as row_count,
-        sum(am.acv) as total_acv
-    from finance_db.public.arr_master am
+        sum(acv) as total_acv
+    from finance_db.dev_netsuite.arr_master am
     group by all
 ),
 
 new as (
     select
-        amn.direct_ecomm_flag,
-        amn.direct_indirect,
-        amn.product_name,
+        direct_ecomm_flag,
+        direct_indirect,
+        product_name,
+        coalesce(naics_sector,'N/A') naics_sector,
+        coalesce(ship_region,'N/A') ship_region,
         count(*) as row_count,
-        sum(amn.acv) as total_acv
+        sum(acv) as total_acv
     from finance_db.dev_netsuite.arr_master_new amn
     group by all
 ),
@@ -76,6 +80,8 @@ dimension_diffs as (
         coalesce(o.direct_ecomm_flag, n.direct_ecomm_flag) as direct_ecomm_flag,
         coalesce(o.direct_indirect, n.direct_indirect) as direct_indirect,
         coalesce(o.product_name, n.product_name) as product_name,
+        coalesce(o.naics_sector, n.naics_sector) as naics_sector,
+        coalesce(o.ship_region, n.ship_region) as ship_region,
         o.row_count as orig_row_count,
         n.row_count as new_row_count,
         coalesce(o.row_count, 0) - coalesce(n.row_count, 0) as row_count_diff,
@@ -87,6 +93,8 @@ dimension_diffs as (
             on o.direct_ecomm_flag = n.direct_ecomm_flag
             and o.direct_indirect = n.direct_indirect
             and o.product_name = n.product_name
+            and o.naics_sector = n.naics_sector
+            and o.ship_region = n.ship_region
     -- where coalesce(o.row_count, 0)           <> coalesce(n.row_count, 0)
     --    or coalesce(round(o.total_acv, 2), 0) <> coalesce(round(n.total_acv, 2), 0)
 )

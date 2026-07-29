@@ -154,3 +154,6 @@ from
     sfdc_split ss
     inner join sfdc_unique su on ss.invoice_no = su.invoice_no
 ;
+select *
+from finance_db.dev_netsuite.vw_sfdc_invoice_data
+where invoice_no = 'IR-627353'

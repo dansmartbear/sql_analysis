@@ -243,7 +243,7 @@ begin
             ns.ship_state,
             ns.ship_city,
             ns.incomeaccountname,
-            ns.inline_discount,  -- vw_ns_ss546_new outputs a clean decimal; no empty-string guard needed
+            ns.inline_discount / 100 as inline_discount,  -- vw_ns_ss546_new outputs a clean decimal; no empty-string guard needed
             ns.ship_region,
             ns.naics,
             -- 05/18/2026 [Dan Girard] naics_sector pulled directly from view; eliminates redundant NAICS join in final SELECT
@@ -335,7 +335,7 @@ begin
             '' as ship_region,
             '' as naics,
             -- 05/18/2026 [Dan Girard] proforma rows have no NAICS data; stub to empty string
-            '' as naics_sector,
+            'N/A' as naics_sector,
             p.direct_ecomm_flag,
             ph.product_for_reporting_ns,
             ph.product_for_reporting_group_ns,

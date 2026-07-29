@@ -1,7 +1,4 @@
-call finance_db.dev_netsuite.sp_master_billing()
-;
-
-create or replace procedure finance_db.dev_netsuite.sp_master_billing()
+create or replace procedure finance_db.public.sp_master_billing()
     returns varchar
     language sql
     execute as owner
@@ -53,7 +50,7 @@ Updates:    2/14/2023 [Dan Girard]  Add region and NAICS
             04/06/2026 [Dan Girard] Added Zephyr Advanced to direct_indirect
             04/22/2026 [Dan Girard] Added back fields per Mike Curran (03/20/2026 [Dan Girard] Added back per Mike Curran)
 ***********************************************************************/
-create or replace table finance_db.dev_netsuite.master_billing copy grants
+create or replace table finance_db.public.master_billing copy grants
 (
     master_billing_id                             number(38,0) identity(1,1)
     , reporting_status                            varchar(30)  
@@ -202,6 +199,10 @@ create or replace table finance_db.dev_netsuite.master_billing copy grants
 
     -- 06/18/2026 [Dan Girard] Added entity
     , entity                                      varchar(500)
+
+    -- 07/06/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+    , transaction_id                              varchar(500)  
+    , boomi_external_id                           varchar(500)  
 ) as
 
 -- 02/07/2024 [Dan Girard] Added CTEs to pull all invoice #s, close dates, opp_id_18s, and account ids
@@ -371,7 +372,11 @@ sfdc_inv_list_full as
         , ns.ship_state
         , ns.ship_city
         , ns.incomeaccountname
-        , case when ns.inline_discount = '' then 0 else ns.inline_discount/100 end inline_discount
+
+        -- 07/20/2026 [Dan Girard] Removed old logic
+        -- , case when ns.inline_discount = '' then 0 else ns.inline_discount/100 end inline_discount
+        , ns.inline_discount / 100 inline_discount
+        
         -- 2/14/2023 [Dan Girard] Add region and NAICS
         , ns.ship_region
         , ns.naics
@@ -454,6 +459,10 @@ sfdc_inv_list_full as
 
         -- 06/18/2026 [Dan Girard] Added entitynohierarchy
         , ns.entitynohierarchy entity
+
+        -- 07/06/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+        , ns.transaction_id
+        , ns.boomi_external_id
     from 
         finance_db.public.vw_ns_ss546 ns
         -- 02/07/2024 [Dan Girard] Added SFDC_CloseDate JOIN
@@ -576,6 +585,10 @@ sfdc_inv_list_full as
 
         -- 06/18/2026 [Dan Girard] Added entitynohierarchy
         , 'Proforma' entity
+
+        -- 07/06/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+        , '' transaction_id
+        , '' boomi_external_id
     from
         finance_db.public.pf_billings p
 )
@@ -1000,6 +1013,10 @@ sfdc_inv_list_full as
 
     -- 06/18/2026 [Dan Girard] Added entitynohierarchy
     , a.entity
+
+    -- 07/06/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+    , a.transaction_id
+    , a.boomi_external_id
 from
     a   //Unioned table of the NS actuals (A) and the Proforma (P) is then renamed A
     left join finance_db.public.dim_country_map scm on a.ship_country = scm.original_country
@@ -1166,6 +1183,10 @@ select
 
     -- 06/18/2026 [Dan Girard] Added entitynohierarchy
     , mb.entity
+
+    -- 07/06/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+    , mb.transaction_id
+    , mb.boomi_external_id
 from
     mb
     left join finance_db.public.dim_product_group_map pg on upper(mb.product_for_reporting) = upper(pg.product_name)
@@ -1173,7 +1194,7 @@ from
     left join finance_db.public.vw_naics_mapping nm on mb.naics = to_char(nm.naics_code)
     ;
 
-    return 'Successfully created or replaced table finance_db.dev_netsit.master_billing.';
+    return 'Successfully created or replaced table finance_db.public.master_billing.';
 
 end;
 $$

@@ -1,4 +1,4 @@
-create or replace procedure finance_db.dev_netsuite.sp_arr_master_waterfall()
+create or replace procedure finance_db.public.sp_arr_master_waterfall()
     returns varchar
     language sql
     execute as owner
@@ -6,7 +6,7 @@ as
 $$
 begin
 
-    create or replace table finance_db.dev_netsuite.arr_master_waterfall copy grants as
+    create or replace table finance_db.public.arr_master_waterfall copy grants as
     
     select
         dd.month_end as date_under_contract,
@@ -104,8 +104,13 @@ begin
 
         -- 05/29/2026 [Dan Girard] Added SFDC_Name
         sfdc_name,
+
+        -- 07/06/2026 [Dan Girard] Added TRANSACTION_ID and BOOMI_EXTERNAL_ID,
+        arr.transaction_id,
+        arr.boomi_external_id,
+        
     from
-        finance_db.dev_netsuite.arr_master arr
+        finance_db.public.arr_master arr
         left join (select distinct month_start, month_end from data_master_db.public.dimdate) dd on dd.month_end between arr.contractitemstartdate
             and arr.contractitemenddate
 

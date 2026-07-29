@@ -1,10 +1,10 @@
-create or replace procedure finance_db.dev_netsuite.sp_arr_master_waterfall_new()
-    returns varchar
-    language sql
-    execute as owner
-as
-$$
-begin
+-- create or replace procedure finance_db.dev_netsuite.sp_arr_master_waterfall_new()
+--     returns varchar
+--     language sql
+--     execute as owner
+-- as
+-- $$
+-- begin
 
     /**********************************************************************
 
@@ -39,8 +39,6 @@ begin
                 The ZEPHYR SCALE AUTOMATE branch in productgroup_child uses
                 arr.productgroup (raw) intentionally — preserved from original.
 
-                Re-pointed to arr_master_new on 06/29/2026 [Dan Girard]:
-                arr.region updated to arr.ship_region (column renamed in new table)
 
     ***********************************************************************/
     create or replace table finance_db.dev_netsuite.arr_master_waterfall_new copy grants as

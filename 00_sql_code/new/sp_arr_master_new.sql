@@ -8,7 +8,7 @@ begin
 
     /**********************************************************************
 
-    Name:       finance_db.dev_netsuite.arr_master_new
+    Name:       finance_db.dev_netsuite.arr_master_waterfall
     Type:       Table
     Created:    01/10/2023 [Dan Girard]
     Purpose:    Central ARR/ACV fact table. Combines AS REPORTED actuals
@@ -77,7 +77,6 @@ begin
                                         datediff fix; CASE hygiene; alias qualification
                 05/20/2026 [Dan Girard]  Renamed ACV_LENGTH_RAW → CONTRACT_LENGTH_RAW;
                                         renamed LENGTH_DAYS → CONTRACT_LENGTH;
-                                        renamed REGION → SHIP_REGION (original name was REGION);
                                         added VER_DATE (current_timestamp) to final SELECT
 
     ***********************************************************************/
@@ -201,7 +200,7 @@ begin
                     and ns.sfdctype in ('New', 'Expansion') then 'License'
                 when coalesce(ns.ordertype1, '') = ''
                     and ns.sfdctype = 'Renewal'             then 'Renewal'
-                else null
+                else ''
             end as ordertype1,
             ns.pricelevel,
             ns.product,
@@ -251,9 +250,13 @@ begin
             'N/A' as source, -- logic lives on dim_datecontracts
             ns.itemcategoryhidden,
             -- 2/14/2023 [Dan Girard] Add region (originally named REGION; renamed to SHIP_REGION 05/20/2026)
-            ns.ship_region as ship_region,
+            case when coalesce(ns.ship_region,'') = '' then 'N/A'
+                else ns.ship_region
+                end as ship_region,
             -- 05/18/2026 [Dan Girard] naics_sector pulled directly from view; no NAICS join needed
-            ns.naics_sector,
+            case when coalesce(ns.naics_sector,'') = '' then 'N/A'
+                else ns.naics_sector
+                end as naics_sector,
             -- 11/14/2024 [Dan Girard] Added stream_revenue
             case
                 when ns.incomeaccountname ilike '%License Revenue%'                            then 'Perpetual License'
@@ -364,11 +367,12 @@ begin
             a.itemcategoryhidden,
             a.region as ship_region,  -- 05/20/2026 [Dan Girard] renamed from REGION to SHIP_REGION
             -- 05/18/2026 [Dan Girard] NAICS_SECTOR confirmed in ARR_MASTER_PROFORMA DDL; pulled directly
-            a.naics_sector,
+            coalesce(a.naics_sector,'N/A') naics_sector,
             -- 11/14/2024 [Dan Girard] proforma rows have no income account; stream_revenue is null
             null as stream_revenue
         from
             finance_db.public.arr_master_proforma a
+
     )
 
     -- ============================================================================
@@ -432,8 +436,13 @@ begin
             u.flag_proforma,
             u.source,
             u.itemcategoryhidden,
-            u.ship_region,
-            u.naics_sector,
+            case when coalesce(u.ship_region,'') = '' then 'N/A'
+                else u.ship_region
+                end as ship_region,
+            -- 05/18/2026 [Dan Girard] naics_sector pulled directly from view; no NAICS join needed
+            case when coalesce(u.naics_sector,'') = '' then 'N/A'
+                else u.naics_sector
+                end as naics_sector,
             u.stream_revenue,
             p.pbt_group,
             -- 11/28/2023 [Dan Girard] direct_ecomm_flag
@@ -581,18 +590,22 @@ begin
                 when product_name in ('QTM', 'QTM4J')                                         then 'Test'
                 else null
             end as product_name_group,
+
+            
             -- 07/11/2024 [Dan Girard] Core/Enterprise flag from SFDC
             -- 03/26/2025 [Dan Girard] Updated logic to remove nulls
             -- 05/18/2026 [Dan Girard] sfdc_ent_core_flag → sfdc_core_ent_flag to match vw_sfdc_invoice_data output
-            case
-                when coalesce(sf.sfdc_core_ent_flag, '') = '' and direct_ecomm_flag = 'Ecomm'  then 'Ecomm'
-                when coalesce(sf.sfdc_core_ent_flag, '') = '' and direct_ecomm_flag = 'Direct' then 'Core'
-                else sf.sfdc_core_ent_flag
-            end as sfdc_ent_core_flag,
+            -- case
+            --     when coalesce(sf.sfdc_core_ent_flag, '') = '' and direct_ecomm_flag = 'Ecomm'  then 'Ecomm'
+            --     when coalesce(sf.sfdc_core_ent_flag, '') = '' and direct_ecomm_flag = 'Direct' then 'Core'
+            --     else sf.sfdc_core_ent_flag
+            -- end as sfdc_ent_core_flag,
+            'Core' as sfdc_ent_core_flag,
+            
             -- 11/07/2024 [Dan Girard] billing_term
             case
                 when u.contract_length <= 33 then 'Monthly'
-                when u.contract_length is null then null
+                -- when u.contract_length is null then null
                 else 'Annual'
             end as billing_term,
             -- 11/24/2025 [Dan Girard] datasource_group

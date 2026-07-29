@@ -127,7 +127,10 @@ with unioned as
         incomeaccountname,
         bill_region,
         ship_region,
-        inline_discount,
+
+        -- 07/20/2026 [Dan Girard] Added COALESCE and TO_DOUBLE
+        coalesce(to_double(inline_discount),0) inline_discount,
+        
         aws_mkt_private_offer,
         aws_mkt_cosell,
         a.ver_date,
@@ -447,7 +450,10 @@ with unioned as
         incomeaccountname,
         bill_region,
         ship_region,
-        inline_discount,
+
+        -- 07/20/2026 [Dan Girard] Added COALESCE and TO_DOUBLE
+        coalesce(to_double(inline_discount),0) inline_discount,
+        
         aws_mkt_private_offer,
         aws_mkt_cosell,
         a.ver_date,
@@ -772,6 +778,10 @@ select
     u.pochecknumber,
     u.externalid,
     u.productline,
+
+    -- 07/06/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+    u.transaction_id,
+    u.boomi_external_id,
 from 
     unioned u
     left join finance_db.public.dim_product_dm_hierarchy_tbl p on upper(concat(u.sisense_product_rollup_calc,'_',u.direct_ecomm_flag)) = p.lookup_map_upper

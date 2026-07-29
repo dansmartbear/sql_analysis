@@ -20,22 +20,26 @@ with
 
 original as (
     select
-        wf.source,
-        wf.productgroup,
-        wf.product_group_rollup,
+        source,
+        productgroup,
+        product_group_rollup,
+        coalesce(naics_sector,'N/A') as naics_sector,
+        coalesce(ship_region,'N/A') as ship_region,
         count(*) as row_count,
-        sum(wf.acv) as total_acv
-    from finance_db.public.arr_master_waterfall wf
+        sum(acv) as total_acv
+    from finance_db.dev_netsuite.arr_master_waterfall wf
     group by all
 ),
 
 new as (
     select
-        wfn.source,
-        wfn.productgroup,
-        wfn.product_group_rollup,
+        source,
+        productgroup,
+        product_group_rollup,
+        coalesce(naics_sector,'N/A') as naics_sector,
+        coalesce(ship_region,'N/A') as ship_region,
         count(*) as row_count,
-        sum(wfn.acv) as total_acv
+        sum(acv) as total_acv
     from finance_db.dev_netsuite.arr_master_waterfall_new wfn
     group by all
 ),
@@ -76,6 +80,8 @@ dimension_diffs as (
         coalesce(o.source, n.source) as source,
         coalesce(o.productgroup, n.productgroup) as productgroup,
         coalesce(o.product_group_rollup, n.product_group_rollup) as product_group_rollup,
+        coalesce(o.naics_sector, n.naics_sector) as naics_sector,
+        coalesce(o.ship_region, n.ship_region) as ship_region,
         o.row_count as orig_row_count,
         n.row_count as new_row_count,
         coalesce(o.row_count, 0) - coalesce(n.row_count, 0) as row_count_diff,
@@ -87,6 +93,8 @@ dimension_diffs as (
             on o.source = n.source
             and o.productgroup = n.productgroup
             and o.product_group_rollup = n.product_group_rollup
+            and o.naics_sector = n.naics_sector
+            and o.ship_region = n.ship_region
     -- where coalesce(o.row_count, 0)           <> coalesce(n.row_count, 0)
     --    or coalesce(round(o.total_acv, 2), 0) <> coalesce(round(n.total_acv, 2), 0)
 )

@@ -146,6 +146,29 @@ Proforma branch column aliases corrected to match actual DDL:
 
 **Net effect:** One fewer join in `master_billing_new`; `naics_sector` values are identical to what the view computes.
 
+### 2026-07-20 — original/ files refreshed to match live PUBLIC production
+
+`sp_arr_master.sql`, `sp_arr_master_retention.sql`, `sp_arr_master_waterfall.sql`, `sp_master_billing.sql`, and `vw_ns_ss546.sql` in `00_sql_code/original/` were updated to reflect what's currently deployed in `finance_db.public`. This is a resync of the reference copies, not new dev work.
+
+**Why:** Dan confirmed the `dev_netsuite` → `public` schema-reference reversion in the four SPs was deliberate — it matches what's actually running in `public` today, not a regression against the `_new`/`dev_netsuite` refactor effort.
+
+**How to apply:** The `dev_netsuite`-suffixed (`_new`) objects (`arr_master_new`, `master_billing_new`, `vw_ns_ss546_new`, etc.) are now behind production on these points — check before assuming parity:
+- Missing `transaction_id` and `boomi_external_id` columns (added in `vw_ns_ss546` → threaded into `arr_master`, `arr_master_waterfall`, `master_billing`).
+- `vw_ns_ss546`: `inline_discount` now `coalesce(to_double(inline_discount),0)` in the raw union (was a raw passthrough). `master_billing`'s inline_discount guard was simplified to rely on this.
+- `sp_arr_master`: `product_name_group` CASE gained an `else product_name` fallback (was previously implicit null).
+
+Before resuming any `_new` refactor work on these objects, port these production changes over first.
+
+### 2026-07-20 — validation baselines intentionally repointed to dev_netsuite
+
+`arr_master_new_validation.sql` and `arr_master_waterfall_new_validation.sql` had their `original` CTE source changed from `finance_db.public.arr_master(_waterfall)` to `finance_db.dev_netsuite.arr_master(_waterfall)`. Dan confirmed this was deliberate, not a mistake.
+
+**Why:** Not stated beyond "intentional" — worth asking again if it comes up, but treat `dev_netsuite.arr_master`/`arr_master_waterfall` as the correct baseline for these two validations going forward, matching `arr_master_retention_new_validation.sql` (which was always baselined against `dev_netsuite.arr_master_retention`).
+
+**How to apply:** All three `_new` validation files now consistently baseline against `dev_netsuite`, not `public`. Header docstrings in `arr_master_new_validation.sql` and `arr_master_waterfall_new_validation.sql` were updated to match (previously said `public`, now say `dev_netsuite`).
+
+**Still open:** `arr_master_retention_new_validation.sql`'s `dimension_diffs` `where` filter was uncommented (`where coalesce(o.row_count,0) <> coalesce(n.row_count,0)`) — now only surfaces row-count mismatches, not amount-only diffs, and differs from the other two files which still dump all rows. Not yet confirmed whether this is intentional.
+
 ### 2026-06-29 — arr_master_retention_new: refactor complete
 
 **Procedure:** `finance_db.dev_netsuite.sp_arr_master_retention_new()`

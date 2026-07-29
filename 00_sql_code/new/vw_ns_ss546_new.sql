@@ -25,10 +25,8 @@
   05/15/2026  Dan Girard  Refactored: moved all calculated columns out of union into downstream CTEs;
                           replaced product dimension calculations with dim_product_dm_hierarchy_tbl join
   05/15/2026  Dan Girard  Added join to vw_naics_mapping_new; added naics_sector column (NAICS_SECTOR_CODE - NAICS_SECTOR)
-  05/18/2026  Dan Girard  Added product_group from dim_product_dm_hierarchy_tbl
   05/18/2026  Dan Girard  Added productgroup from dim_product_dm_hierarchy_tbl
-  06/23/2026  Dan Girard  Added transaction_id (netsuite_id) and boomi_external_id
-  
+
   Owner       Dan Girard
 ==============================================================================*/
 create or replace view finance_db.dev_netsuite.vw_ns_ss546_new as
@@ -123,7 +121,7 @@ raw_union as (
         a.incomeaccountname,
         a.bill_region,
         a.ship_region,
-        a.inline_discount,
+        coalesce(to_double(a.inline_discount),0) inline_discount,
         a.aws_mkt_private_offer,
         a.aws_mkt_cosell,
         a.ver_date,
@@ -235,7 +233,7 @@ raw_union as (
         a.incomeaccountname,
         a.bill_region,
         a.ship_region,
-        a.inline_discount,
+        coalesce(to_double(a.inline_discount),0) inline_discount,
         a.aws_mkt_private_offer,
         a.aws_mkt_cosell,
         a.ver_date,
@@ -498,7 +496,11 @@ select
     m.lineofbusiness,
     m.naics,
     -- 05/15/2026 [Dan Girard] Added NAICS sector lookup from vw_naics_mapping_new
-    concat(n.naics_sector_code, ' - ', n.naics_sector) as naics_sector,
+
+    case when coalesce(n.naics_sector_code,'') = '' then 'N/A'
+        else concat(n.naics_sector_code, ' - ', n.naics_sector) 
+        end as naics_sector,
+    
     m.sic,
     m.dateoffirstsale,
     m.averagerate,
@@ -512,7 +514,11 @@ select
     m.ship_city,
     m.incomeaccountname,
     m.bill_region,
-    m.ship_region,
+    
+    case when coalesce(m.ship_region,'') = '' then 'N/A'
+        else m.ship_region
+        end as ship_region,
+    
     m.inline_discount,
     m.aws_mkt_private_offer,
     m.aws_mkt_cosell,
@@ -532,8 +538,6 @@ select
     p.product_parent,
     p.pbt_group,
     p.ai,
-    -- 05/18/2026 [Dan Girard] Added product_group from dim_product_dm_hierarchy_tbl
-    p.product_group,
     -- 05/18/2026 [Dan Girard] Added productgroup from dim_product_dm_hierarchy_tbl
     p.productgroup,
     m.salesperson,
