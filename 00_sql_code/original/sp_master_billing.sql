@@ -8,7 +8,7 @@ begin
 
 /**********************************************************************
 
-Name:       finance_db.dev_netsuite.master_billing
+Name:       finance_db.public.master_billing
 Type:       Table
 Created:    Dan Girard (1/10/2023)
 Purpose:    This query will create a table called MASTER_BILLING to act

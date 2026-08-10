@@ -956,3 +956,5 @@ begin
 end;
 $$
 ;
+
+-- select * from finance_db.dev_netsuite.arr_master_retention_new;

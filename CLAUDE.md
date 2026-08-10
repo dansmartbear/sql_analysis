@@ -23,6 +23,7 @@ This workstation handles all SQL-related work: reviewing, optimizing, and refact
    - `00_sql_code/original/` — read-only reference; never write or modify files here
    - `00_sql_code/new/` — read and write all new or refactored SQL here
    - `00_sql_code/validation/` — read and write all validation queries here
+   - `00_sql_code/changelog/` — read and write all changelog files here
    - Save all other deliverables (docs, notes, catalogs) to the root `SQL Analysis/` folder. Update MEMORY.md with any new decisions.
 
 ## Editorial Rules

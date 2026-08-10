@@ -1,31 +1,6 @@
--- create or replace view finance_db.public.vw_elt_metrics copy grants as
+create or replace view finance_db.public.vw_elt_metrics copy grants as
 with 
--- Create the anchor date calculation by checking the current date against the 5th business day
-fifth_bd as (
-    select 
-        case 
-        when current_date() >= (
-            dateadd(day, 
-            case 
-                when dayofweek(date_trunc('month', current_date())) = 0 then 4
-                when dayofweek(date_trunc('month', current_date())) = 6 then 5
-                else 5 - dayofweek(date_trunc('month', current_date()))
-            end, 
-            date_trunc('month', current_date())
-        )) then date_trunc('month', current_date())
-        else dateadd(month, -1, date_trunc('month', current_date()))
-        end as fifth_business_day
-)
-,anchor_date as
-(
-    select 
-        case 
-            when current_date() >= fifth_business_day then date_trunc('month', current_date())
-            else dateadd(month, -1, date_trunc('month', current_date()))
-        end as anchor_date_calc
-    from fifth_bd
-)
-,lic_ren_split as
+lic_ren_split as
 (
     select 'BitBar'        product, .32363942411 license, 1-license renewal union all
     select 'Device Cloud'  product, .32363942411 license, 1-license renewal union all
@@ -972,9 +947,138 @@ fifth_bd as (
         arr a
         left join finance_db.public.dim_product_dm_hierarchy_tbl b on upper(concat(a.product,'_',a.direct_ecomm_flag)) = b.lookup_map_upper
 )
+,final as
+(
+    select
+        report_month,
+        source,
+        product,
+        type,
+        core_ent_flag,
+        direct_ecomm_flag,
+        direct_indirect,
+        order_type_final,
+        amount_usd,
+        acv,
+        acv_prior,
+        my,
+        invoice_no,
+        product_for_reporting,
+        product_name,
+        product_parent,
+        product_hub,
+        pbt_group,
+        to_date(date) date,
+        globalultimateparentupperclean,
+        multiyear_flag,
+        status_inq_pull,
+        billing_period,
+        new_expansion,
+        region,
+        dateadd(day,-1,current_date()) data_valid_thru,
+        current_timestamp () snapshot_date,
+        date_part('timezone_hour', snapshot_date::timestamp_tz) snapshot_date_offset,
+    
+        -- 06/23/2025 [Dan Girard] Added PF_HOLD
+        pf_hold_flag,
+        pf_hold_amount,
+    
+        -- 08/19/2025 [Dan Girard] Added new Close Date
+        closedate,
+    
+        -- 04/28/2026 [Dan Girard] Added saletype
+        saletype,
+        'USD' currency,
+        
+        anchor_date_calc,
+    
+        case when order_type_final = 'Renewal' then 'Renewal'
+            else 'License'
+            end license_renewal,
+        
+        case when date_trunc('quarter',report_month) = date_trunc('quarter',anchor_date_calc)
+                and date_trunc('month',report_month) = date_trunc('month',anchor_date_calc) then true
+            else false
+            end  in_month_flag,
+    
+        case when date_trunc('quarter',report_month) = date_trunc('quarter',anchor_date_calc) then true
+            else false
+            end  in_quarter_flag,
+    
+        case when date_trunc('year',report_month) = date_trunc('year',anchor_date_calc) then true
+            else false
+            end  in_current_year_flag,
+    
+         case when date_trunc('quarter',report_month) = date_trunc('quarter',dateadd('quarter',-1,anchor_date_calc)) then true
+            else false
+            end  in_prev_quarter_flag,
+    
+        case 
+            when source = 'ARR' then 'ARR'
+            when source = 'Actuals' then 'Actuals'
+            when source = 'Atlassian' then 'In Month'
+            when source = 'Braintree' then 'In Month'
+            when source = 'SFDC' then 'In Month'
+            when source = 'Stripe' then 'In Month'
+            when source ilike '%Plan%' then 'Plan'
+            when source ilike '%Fcst%' then 'Plan'
+            end source_group,
+    
+        case 
+            when direct_indirect = 'Direct' and license_renewal = 'License' then 'Direct License'
+            when direct_indirect = 'Direct' and license_renewal = 'Renewal' then 'Direct Renewal'
+            when direct_indirect = 'Indirect - Atlassian' then 'Atlassian'
+            when direct_indirect = 'Indirect - Ecomm' then 'SmartBear Ecomm'
+            else 'Uncategorized'
+            end billing_category,
+        
+    from    
+        combined
+        left join finance_db.public.vw_elt_metrics_anchor_date on 1=1
+)
 select
-    uuid_string() elt_metrics_uid,
-    -- row_number() over (order by 1) as elt_metrics_id,
+    row_number() over (order by 1) as elt_metrics_id,
+    md5(
+        concat_ws('||',
+            coalesce(source,''),
+            coalesce(to_varchar(report_month),''),
+            coalesce(product,''),
+            coalesce(type,''),
+            coalesce(core_ent_flag,''),
+            coalesce(direct_ecomm_flag,''),
+            coalesce(direct_indirect,''),
+            coalesce(order_type_final,''),
+            coalesce(invoice_no,''),
+            coalesce(to_varchar(date),''),
+            coalesce(globalultimateparentupperclean,''),
+            coalesce(status_inq_pull,''),
+            coalesce(billing_period,''),
+            coalesce(new_expansion,''),
+            coalesce(region,''),
+            coalesce(product_for_reporting,''),
+            coalesce(product_name,''),
+            coalesce(product_parent,''),
+            coalesce(product_hub,''),
+            coalesce(pbt_group,''),
+            coalesce(license_renewal,''),
+            coalesce(billing_category,''),
+            coalesce(source_group,'')
+            )
+        ) as record_id,
+    md5(
+        concat_ws('||',
+            -- all the record_id dimension inputs, plus:
+            coalesce(to_varchar(amount_usd),''),
+            coalesce(to_varchar(acv),''),
+            coalesce(to_varchar(acv_prior),''),
+            coalesce(to_varchar(my),''),
+            coalesce(to_varchar(multiyear_flag),''),
+            coalesce(to_varchar(pf_hold_flag),''),
+            coalesce(to_varchar(pf_hold_amount),''),
+            coalesce(to_varchar(closedate),''),
+            coalesce(saletype,'')
+            )
+        ) as row_hash,
     report_month,
     source,
     product,
@@ -1000,64 +1104,22 @@ select
     billing_period,
     new_expansion,
     region,
-    dateadd(day,-1,current_date()) data_valid_thru,
-    current_timestamp () snapshot_date,
-    date_part('timezone_hour', snapshot_date::timestamp_tz) snapshot_date_offset,
-
-    -- 06/23/2025 [Dan Girard] Added PF_HOLD
+    data_valid_thru,
+    snapshot_date,
+    snapshot_date_offset,
     pf_hold_flag,
     pf_hold_amount,
-
-    -- 08/19/2025 [Dan Girard] Added new Close Date
     closedate,
-
-    -- 04/28/2026 [Dan Girard] Added saletype
     saletype,
-    'USD' currency,
-    
+    currency,
     anchor_date_calc,
-
-    case when order_type_final = 'Renewal' then 'Renewal'
-        else 'License'
-        end license_renewal,
-    
-    case when date_trunc('quarter',report_month) = date_trunc('quarter',anchor_date_calc)
-            and date_trunc('month',report_month) = date_trunc('month',anchor_date_calc) then true
-        else false
-        end  in_month_flag,
-
-    case when date_trunc('quarter',report_month) = date_trunc('quarter',anchor_date_calc) then true
-        else false
-        end  in_quarter_flag,
-
-    case when date_trunc('year',report_month) = date_trunc('year',anchor_date_calc) then true
-        else false
-        end  in_current_year_flag,
-
-     case when date_trunc('quarter',report_month) = date_trunc('quarter',dateadd('quarter',-1,anchor_date_calc)) then true
-        else false
-        end  in_prev_quarter_flag,
-
-    case 
-        when source = 'ARR' then 'ARR'
-        when source = 'Actuals' then 'Actuals'
-        when source = 'Atlassian' then 'In Month'
-        when source = 'Braintree' then 'In Month'
-        when source = 'SFDC' then 'In Month'
-        when source = 'Stripe' then 'In Month'
-        when source ilike '%Plan%' then 'Plan'
-        when source ilike '%Fcst%' then 'Plan'
-        end source_group,
-
-    case 
-        when direct_indirect = 'Direct' and license_renewal = 'License' then 'Direct License'
-        when direct_indirect = 'Direct' and license_renewal = 'Renewal' then 'Direct Renewal'
-        when direct_indirect = 'Indirect - Atlassian' then 'Atlassian'
-        when direct_indirect = 'Indirect - Ecomm' then 'SmartBear Ecomm'
-        else 'Uncategorized'
-        end billing_category,
-    
-from    
-    combined
-    left join anchor_date on 1=1
+    license_renewal,
+    in_month_flag,
+    in_quarter_flag,
+    in_current_year_flag,
+    in_prev_quarter_flag,
+    source_group,
+    billing_category,
+from
+    final
 ;

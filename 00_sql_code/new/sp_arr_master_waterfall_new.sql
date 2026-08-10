@@ -148,3 +148,7 @@ begin
 
 end;
 $$
+;
+select * from finance_db.dev_netsuite.arr_master_waterfall
+where productgroup = 'BearQ'
+;

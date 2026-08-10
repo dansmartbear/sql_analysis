@@ -153,11 +153,20 @@ Proforma branch column aliases corrected to match actual DDL:
 **Why:** Dan confirmed the `dev_netsuite` → `public` schema-reference reversion in the four SPs was deliberate — it matches what's actually running in `public` today, not a regression against the `_new`/`dev_netsuite` refactor effort.
 
 **How to apply:** The `dev_netsuite`-suffixed (`_new`) objects (`arr_master_new`, `master_billing_new`, `vw_ns_ss546_new`, etc.) are now behind production on these points — check before assuming parity:
-- Missing `transaction_id` and `boomi_external_id` columns (added in `vw_ns_ss546` → threaded into `arr_master`, `arr_master_waterfall`, `master_billing`).
+- `transaction_id`/`boomi_external_id`: **`vw_ns_ss546_new` already has these** (added 06/23/2026, confirmed present as of 08/10/2026 — corrects an earlier session's mistaken claim that the view was missing them, which came from a `&&`-chained grep that silently short-circuited). The actual gap is downstream: `sp_arr_master_new` and `sp_master_billing_new` both join `vw_ns_ss546_new` (alias `ns`) but never select `ns.transaction_id`/`ns.boomi_external_id` into their output. `sp_arr_master_waterfall_new` inherits the gap secondhand since it sources from `arr_master_new`. **Status 08/10/2026: closed in `sp_master_billing_new` (via `max()` — see that entry). Still open in `sp_arr_master_new` and, downstream of it, `sp_arr_master_waterfall_new`.** Check whether `arr_master_new`'s equivalent CTE also aggregates under `group by all` before adding them as plain columns.
 - `vw_ns_ss546`: `inline_discount` now `coalesce(to_double(inline_discount),0)` in the raw union (was a raw passthrough). `master_billing`'s inline_discount guard was simplified to rely on this.
 - `sp_arr_master`: `product_name_group` CASE gained an `else product_name` fallback (was previously implicit null).
 
 Before resuming any `_new` refactor work on these objects, port these production changes over first.
+
+### 2026-08-10 — original/ rescan: cosmetic-only, plus out-of-scope vw_elt_metrics rewrite
+
+Rescanned `00_sql_code/original/` against git HEAD. Findings for the 5 tracked queries: no functional changes.
+- `sp_arr_master.sql`: one blank line removed inside the `main` CTE — whitespace only.
+- `sp_arr_master_retention.sql` / `sp_master_billing.sql`: header docstring comments corrected from `dev_netsuite` to `public` (the actual `create table`/`create or replace procedure` targets were already `public`; only the comment text was stale). No code change.
+- `sp_arr_master_waterfall.sql`, `vw_ns_ss546.sql`: unchanged.
+
+**Not one of the 5 tracked queries, but flagging since it's in `original/`:** `vw_elt_metrics.sql` was substantially rewritten — `fifth_bd`/`anchor_date` CTEs replaced by a join to a new `finance_db.public.vw_elt_metrics_anchor_date` object; added `final` CTE; added `elt_metrics_id` (row_number), `record_id` and `row_hash` (both `md5` hashes over key dimension/measure columns) replacing the old `uuid_string()` PK. No `_new` counterpart exists yet — out of current refactor scope, but worth a look if this view feeds anything Dan cares about.
 
 ### 2026-07-20 — validation baselines intentionally repointed to dev_netsuite
 
@@ -174,6 +183,54 @@ Before resuming any `_new` refactor work on these objects, port these production
 - **`sp_arr_master_new.sql`**: `product_name_group` CASE gained `when product_name in ('BearQ') then 'BearQ'`.
 - **`sp_arr_master_waterfall_new.sql`**: the `create or replace procedure ... as $$ begin` wrapper had been commented out while the body and closing `end; $$` were not — the file was syntactically invalid. Wrapper uncommented; file is now a valid, runnable procedure.
 - **`sp_arr_master_retention_new.sql`**: source table repointed from `finance_db.dev_netsuite.arr_master_waterfall` (legacy) to `finance_db.dev_netsuite.arr_master_waterfall_new` (3 references + docstring) — retention now reads from the actual `_new` waterfall table.
+
+### 2026-08-10 — vw_master_billing_new: straight copy, repoint + rename only
+
+**View:** `finance_db.dev_netsuite.vw_master_billing_new`
+**File:** `SQL Analysis/00_sql_code/new/vw_master_billing_new.sql`
+**Changelog:** `SQL Analysis/00_sql_code/changelog/changelog_vw_master_billing_new.md`
+**Validation:** `SQL Analysis/00_sql_code/validation/vw_master_billing_new_validation.sql` — written 08/10/2026, not yet run.
+Deliberately the same shape as `master_billing_new_validation.sql`: `original` / `new` aggregate CTEs → `summary_compare` + `dimension_diffs`, dimensions `direct_ecomm_flag`, `direct_indirect`, `product_name`, `naics_sector`, `ship_region`. Clean = 0 rows in `dimension_diffs`, matching totals in `summary_compare`. Scaffold rows fold into the aggregates — a scaffold cardinality change still shows up as a `row_count` diff, so no separate scaffold check is needed.
+
+**Approach — Dan's call, and the one to repeat.** An optimized rewrite was built first, then discarded in favour of a straight copy of the original with only the mechanical changes applied. Default to minimal-change repoints on this family of objects unless Dan asks for optimization; the analysis behind the rejected optimizations is preserved under "Deferred work" in the changelog rather than in the SQL.
+
+**The complete change list** (a `diff` against `original/vw_master_billing.sql` shows nothing else):
+1. View target → `finance_db.dev_netsuite.vw_master_billing_new`.
+2. Base table, 2 refs (`scaffold` and `combined` CTEs) → `finance_db.dev_netsuite.master_billing_new`.
+3. `product_group` → `productgroup`, 3 refs.
+4. `entity` omitted, 3 refs — `master_billing_new` doesn't carry it. Output 116 → 115 columns; order of the remaining 115 unchanged. `transaction_id` and `boomi_external_id` are present.
+5. Dated header comment line.
+
+**`dim_product_dm_hierarchy_tbl` stayed on `public`** per the standing rule — the `pbt_group` join is untouched. CTE chain unchanged: `date_scaff` → `scaffold` → `combined` → final SELECT.
+
+**What the validation actually tests:** the view logic is identical to the original's, so any diff means `master_billing_new` and `master_billing` disagree. It's a test of the two base tables through identical logic, not of the view. Diagnose failures in `master_billing_new_validation.sql`.
+
+**Open items:**
+- **`entity` is the only remaining parity gap.** `transaction_id` / `boomi_external_id` landed 08/10/2026 — see the `sp_master_billing_new` entry below. Closing `entity` takes `ns.entitynohierarchy as entity` / `'Proforma'` in `raw_union`, the DDL and final SELECT, plus 2 lines in the view. Low grain risk (low cardinality, likely functionally dependent on existing keys) so a plain column is probably safe.
+- `productgroup` rename is surfaced to consumers — downstream Tableau/Sisense field references need updating at promotion.
+- `stream_reporting` is null on scaffold rows. The 01/23/2026 change made it a scaffold dimension (so it constrains which scaffold rows exist) but the scaffold branch of `combined` emits `null stream_reporting` — the value never reaches the output. The change only half-landed. Present in the original, preserved here. Confirm whether emitting it was the intent.
+- Known-but-unaddressed in this view, detailed in the changelog: the `select distinct` after the cross join, the `row_number()` full sort, the now-redundant `pbt_group` join, and two untyped-null / numeric-vs-varchar union quirks.
+
+**First validation run, 08/10/2026 — ~200 fewer rows in `new`, `total_amount_usd` exact.** Diagnosis in progress. Scaffold cardinality is the leading cause and the pairing is close to a signature: scaffold rows carry `null amount_usd`, so losing them moves row count without moving a dollar. Measured: `master_billing_new` has **44 fewer distinct qualifying scaffold dimension combinations** than `master_billing`. `date_scaff` emits 4 rows as of Aug 2026 (it filters to the current calendar year → Sep–Dec), so 44 × 4 = 176, leaving a possible residual.
+
+**The reusable insight:** `scaffold` is a `select distinct` over 15 dimension columns with an `is not null` filter on **all 15**. `master_billing_new_validation.sql` only compares 3 of them (`direct_ecomm_flag`, `direct_indirect`, `product_name`) — so the base tables can validate clean while the view's row count still diverges. One extra null in any of the other 12 drops a scaffold row; a combination that stops appearing costs 4. Prime suspect is the refactor's shift from CASE logic to a `dim_product_dm_hierarchy_tbl` join for product dimensions: a join miss yields null where the CASE had an `else` fallback.
+
+**Next step:** split the gap by `ver_date is null` (scaffold) vs `not null` (base) — `ver_date` is the clean discriminator since the scaffold branch stubs it null. Base half = 0 means the gap is entirely scaffold (benign for totals, but 44 combos lose their forced zero row for Sep–Dec 2026, so downstream views relying on the scaffold to render a visible zero show a gap instead). Base half > 0 means real billing rows are missing whose amounts net to zero — offsetting credits/debits — and that's an SP problem. Then per-column null comparison across the 12 uncompared dimensions.
+
+### 2026-08-10 — sp_master_billing_new: transaction_id / boomi_external_id added via max()
+
+**File:** `SQL Analysis/00_sql_code/new/sp_master_billing_new.sql`
+**Changelog:** `SQL Analysis/00_sql_code/changelog/changelog_sp_master_billing_new.md`
+
+Both columns `varchar(500)`, at 4 touch points: DDL (appended after `pbt_group`), both `raw_union` branches (`ns.*` / `''` stubs), `main` (as `max()`), final SELECT. DDL and final SELECT both 114 columns, positionally aligned. `entity` deliberately not added. Dan confirmed the rebuilt table matches the original.
+
+**The insight worth keeping — `group by all` in `main` is a trap.** `main` computes `sum(u.amount_usd)`, `sum(u.amount)`, `sum(u.acv)`, `sum(u.my)` under `group by all`, so **every non-aggregated column in its SELECT list silently becomes a grouping key.** A first attempt added the ids as plain columns and broke validation — `transaction_id` split groups that previously collapsed, changing row counts and the per-row sums. `max()` keeps them out of the grouping set. Any future column added to `main` needs the same decision.
+
+**Corollary: `max()` is lossy.** Because the plain-column version *did* change the output, `transaction_id` demonstrably varies within existing groups — some billing lines span multiple NetSuite transactions and only one id is reported. Unquantified; diagnostic in the changelog. Production has the same `group by all` *and* these columns as plain keys, so production's grain already reflects the fragmentation.
+
+**Validation baseline caveat:** `dev_netsuite.master_billing` was built from an older SP and lags production. Keep that in mind when a diff looks like a regression.
+
+**Static parity checks earned their keep** on this change: union branch column count/order, and DDL vs. final SELECT positional alignment. Same-count/wrong-order fails silently in both a union and a CTAS. Note that ad-hoc regex column parsers throw false positives on multi-line `CASE` blocks, `row_number() over (order by ...)` lists, and `null as x` — use a paren-depth-aware accumulator.
 
 ### 2026-06-29 — arr_master_retention_new: refactor complete
 
@@ -248,7 +305,7 @@ select
 
 ### Column Name Watchpoints
 
-- `dateoffirstsale` — actual column name in `vw_ns_ss546_new`. Do NOT alias to `date_of_first_sale` in the union branch; use the raw name and let the DDL column position handle it.
+- `dateoffirstsale` — actual column name in `vw_ns_ss546_new`. Do NOT alias to `date_of_first_sale` in the union branch; use the raw name and let the DDL column position handle it. **Consequence:** `master_billing_new`'s own column is named `date_of_first_sale` (that's what its DDL declares); `dateoffirstsale` never becomes a table column name, it only lives inside the SP's CTE chain. Anything reading `master_billing_new` must use `date_of_first_sale`. Easy to misread as a rename — it isn't one.
 - `product_group` vs `product_group_map` — `vw_ns_ss546_new` currently exposes `product_group`; `dim_product_dm_hierarchy_tbl` has `product_group_map`. Both surfaces must be aligned when the view is updated.
 - `inline_discount` — `vw_ns_ss546_new` outputs a clean decimal (already divided by 100); no empty-string guard needed. `public.vw_ns_ss546` returned a raw string and required the guard.
 

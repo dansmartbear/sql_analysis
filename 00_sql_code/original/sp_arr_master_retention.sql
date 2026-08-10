@@ -7,17 +7,17 @@ $$
 begin
 
     /*
-      table: finance_db.dev_netsuite.arr_master_retention
+      table: finance_db.public.arr_master_retention
     
       purpose:
-        - build finance_db.dev_netsuite.arr_master_retention with monthly, quarterly, and year-over-year arr views
+        - build finance_db.public.arr_master_retention with monthly, quarterly, and year-over-year arr views
         - enable retention analysis by customer, product, and various attributes
     
       target table:
-        - finance_db.dev_netsuite.arr_master_retention
+        - finance_db.public.arr_master_retention
     
       primary source tables:
-        - finance_db.dev_netsuite.arr_master_waterfall
+        - finance_db.public.arr_master_waterfall
         - data_master_db.public.dimdate
         - finance_db.public.dim_product_group_map
     

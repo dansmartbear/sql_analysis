@@ -21,7 +21,6 @@ begin
     )
     ,main as
     (
-
         select
             'NS' as datasource,
             concat(internalid, concat_ws('-',lineid)) as key,

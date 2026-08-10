@@ -70,6 +70,9 @@ begin
                                         naics_sector pulled directly from vw_ns_ss546_new; redundant
                                         vw_naics_mapping_new join removed from final SELECT
                 05/20/2026 [Dan Girard]  Added CONTRACT_LENGTH_RAW (datediff without +1) to match ARR_MASTER_NEW
+                08/10/2026 [Dan Girard]  Added TRANSACTION_ID and BOOMI_EXTERNAL_ID to match production;
+                                        wrapped in max() in main so they stay out of the group by all
+                                        grouping set and row grain is preserved. ENTITY not added.
     ***********************************************************************/
     create or replace table finance_db.dev_netsuite.master_billing_new copy grants
     (
@@ -193,6 +196,9 @@ begin
         , braintree_user_id                           varchar(500)
         , billing_category                            varchar(500)
         , pbt_group                                   varchar(500)
+        -- 08/10/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+        , transaction_id                              varchar(500)
+        , boomi_external_id                           varchar(500)
     ) as
     with
     -- ============================================================================
@@ -288,7 +294,13 @@ begin
                 when contract_length <= 366                      then ns.amount_usd
                 else (ns.amount_usd / contract_length) * 365
             end as acv,
-            ns.amount_usd - acv as my
+            ns.amount_usd - acv as my,
+            -- 08/10/2026 [Dan Girard] transaction_id / boomi_external_id. Surfaced in main via
+            --   max() rather than as plain columns: main aggregates under group by all, so a
+            --   plain reference would make these grouping keys and split rows that currently
+            --   collapse into one, changing row counts and the amount_usd / acv / my sums.
+            ns.transaction_id,
+            ns.boomi_external_id
         from
             finance_db.dev_netsuite.vw_ns_ss546_new ns
         union all
@@ -374,7 +386,10 @@ begin
                 when contract_length <= 366 then p.amount_usd
                 else (p.amount_usd / contract_length) * 365
             end as acv,
-            p.amount_usd - acv as my
+            p.amount_usd - acv as my,
+            -- 08/10/2026 [Dan Girard] transaction_id / boomi_external_id: proforma stubs match production
+            '' as transaction_id,
+            '' as boomi_external_id
         from
             finance_db.public.pf_billings p
             left join finance_db.public.dim_product_dm_hierarchy_tbl ph
@@ -492,6 +507,12 @@ begin
             u.product_name_group,
             u.productgroup,
             u.pbt_group,
+            -- 08/10/2026 [Dan Girard] transaction_id / boomi_external_id wrapped in max() so they
+            --   stay out of the group by all grouping set and the row grain is preserved. Note this
+            --   is lossy where a group spans more than one NetSuite transaction -- one id is
+            --   reported rather than the rows being split.
+            max(u.transaction_id) as transaction_id,
+            max(u.boomi_external_id) as boomi_external_id,
             -- ---- SFDC enrichment -----------------------------------------------
             -- 02/07/2024 [Dan Girard] sfdc_closedate from vw_sfdc_invoice_data
             sf.sfdc_closedate,
@@ -837,7 +858,10 @@ begin
         m.stripe_user_id,
         m.braintree_user_id,
         m.billing_category,
-        m.pbt_group
+        m.pbt_group,
+        -- 08/10/2026 [Dan Girard] Added TRANSACTION_ID (NetSuite ID) and BOOMI_EXTERNAL_ID
+        m.transaction_id,
+        m.boomi_external_id
     from
         main m
     ;
