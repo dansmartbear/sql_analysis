@@ -184,6 +184,27 @@ Rescanned `00_sql_code/original/` against git HEAD. Findings for the 5 tracked q
 - **`sp_arr_master_waterfall_new.sql`**: the `create or replace procedure ... as $$ begin` wrapper had been commented out while the body and closing `end; $$` were not — the file was syntactically invalid. Wrapper uncommented; file is now a valid, runnable procedure.
 - **`sp_arr_master_retention_new.sql`**: source table repointed from `finance_db.dev_netsuite.arr_master_waterfall` (legacy) to `finance_db.dev_netsuite.arr_master_waterfall_new` (3 references + docstring) — retention now reads from the actual `_new` waterfall table.
 
+### 2026-08-12 — qry_arr_master_waterfall_prior_acv: row-level prior-ACV query, exploratory
+
+**File:** `SQL Analysis/00_sql_code/new/qry_arr_master_waterfall_prior_acv.sql`
+**Status:** Exploratory — a standalone executable query, not yet promoted to a table/view. Dan will decide placement (new column on `arr_master_waterfall_new` vs. a separate downstream view) after testing.
+
+**Goal:** Add a `prior_acv` field to `arr_master_waterfall_new`-grain detail so any query can group by an arbitrary subset of dimensions and get correct `sum(acv)` / `sum(prior_acv)` at that grain — more granular than `arr_master_retention_new`, which pre-aggregates to a fixed ~13-column grain.
+
+**Match grain** (must match identically to the prior month): `globalultimateparentupper`, `ordertype`, `source`, `productgroup`, `productgroup_child`, `product_group_rollup`, `ship_region`, `naics_sector`, `direct_ecomm_flag`, `product_for_reporting_ns`, `product_for_reporting_group_ns`, `product_for_reporting_ns_alias`, `product_for_reporting_ns_alias_combined`, `product_name`, `core_noncore`, `direct_indirect`, `product_name_group`, `sbitemcategory_calc`, `sfdc_ent_core_flag`, `billing_term`, `pbt_group`, `sfdc_name` (22 dims).
+
+**Excluded from match** (invoice-level/system, carried as row attributes only): `datasource`, `datasource_group`, `key`, `invoice_date`, `invoiceno`, `contractitemstartdate`, `contractitemenddate`, `ver_date`. `month_start`/`month_end` also excluded — fully determined by `date_under_contract`.
+
+**Design decisions (confirmed with Dan 08/12/2026):**
+- **Duplicate rows in one match-group+month** (e.g. two invoices, same customer/product/month) → matched prior-month acv is allocated **proportionally** by each row's share of the group's current acv, not assigned in full to each — keeps sums correct at any grouping grain.
+- **Full churn** (acv last month, none this month) → **placeholder rows are generated** (cur acv = 0, invoice-level columns null, `prior_acv` = the full matched amount), mirroring retention's filler/scaffold pattern but across ~22 dims instead of ~13. This is a materially heavier scaffold (full distinct-combo × full month-range cross join) — flagged as a real cost if/when this gets promoted to a scheduled object.
+- **Placement:** deferred — Dan said "just create an executable query, we'll add it to a table/view later."
+
+**Open items:**
+- `invoiceno` was inferred to belong in the excluded/invoice-level bucket (not explicitly named in the original ask, which called out `key`, invoice date, contract start/end) — flagged in the file header for Dan to confirm.
+- Null/blank dimension values are coalesced to `''` before matching (a `norm` CTE) so `null = null` doesn't silently fail to join — mirrors the existing null-guard on `globalultimateparentupper` in `arr_master_retention_new`, extended to all 22 grain dims here.
+- Not yet run/validated against sample data or `arr_master_waterfall_new` in Snowflake.
+
 ### 2026-08-10 — vw_master_billing_new: straight copy, repoint + rename only
 
 **View:** `finance_db.dev_netsuite.vw_master_billing_new`
